@@ -54,8 +54,15 @@ done
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-if [ ! -d "$SCRIPT_DIR/visual-engine" ]; then
-    echo "${RED}ERROR: install-team.sh is not in the same folder as the skills.${NC}" >&2
+# Skills under skills/ (current layout) or top-level (legacy flat layout)
+if [ -d "$SCRIPT_DIR/skills" ]; then
+    SKILLS_SRC="$SCRIPT_DIR/skills"
+else
+    SKILLS_SRC="$SCRIPT_DIR"
+fi
+
+if [ ! -d "$SKILLS_SRC/visual-engine" ]; then
+    echo "${RED}ERROR: install-team.sh cannot find the skill folders at $SKILLS_SRC${NC}" >&2
     exit 1
 fi
 
@@ -94,13 +101,13 @@ if [ $DRY_RUN -eq 0 ]; then
 fi
 
 for skill in $ALL_SKILLS; do
-    if [ ! -d "$SCRIPT_DIR/$skill" ]; then
+    if [ ! -d "$SKILLS_SRC/$skill" ]; then
         echo "  ${YELLOW}WARN${NC} source missing: $skill (skipped)"
         continue
     fi
     if [ $DRY_RUN -eq 0 ]; then
         rm -rf "$STAGE_DIR/$skill"
-        cp -R "$SCRIPT_DIR/$skill" "$STAGE_DIR/$skill"
+        cp -R "$SKILLS_SRC/$skill" "$STAGE_DIR/$skill"
         find "$STAGE_DIR/$skill" -name "__pycache__" -type d 2>/dev/null | \
             while read d; do rm -rf "$d"; done
         find "$STAGE_DIR/$skill" -name "*.pyc" -type f -delete 2>/dev/null || true

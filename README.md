@@ -20,17 +20,24 @@ The result: a consistent personal visual identity that doesn't look like the sam
 
 ```
 content-image-suite/
-├── visual-engine/                  Shared library (no SKILL.md, not a standalone skill)
-│   ├── scripts/                    Python modules + CLI
-│   ├── references/                 palettes.md, subject-extraction.md, etc.
-│   ├── assets/style_templates/     8 style templates (editorial, cinematic, etc.)
-│   └── tests/                      157 pytest tests
-├── content-image-orchestrator/     Optional top-level skill for multi-platform requests
-├── medium-image-generator/         Medium hero + inline (16:9 + 4:3)
-├── linkedin-image-generator/       LinkedIn cover (1.91:1) OR carousel (1:1, 5-10 slides)
-├── twitter-image-generator/        Tweet image (16:9) + thread card (1:1)
-├── instagram-image-generator/      Feed (1:1), Story/Reel (9:16), carousel
-└── meta-image-generator/           Feed image (1.91:1) + event cover
+├── skills/                         All skill folders live here (Hermes tap layout, agentskills.io compatible)
+│   ├── visual-engine/              Shared library (no SKILL.md, not a standalone skill)
+│   │   ├── scripts/                Python modules + CLI
+│   │   ├── references/             palettes.md, subject-extraction.md, etc.
+│   │   ├── assets/style_templates/ Style templates (editorial, cinematic, etc.)
+│   │   └── tests/                  Pytest tests
+│   ├── content-image-orchestrator/ Optional top-level skill for multi-platform requests
+│   ├── medium-image-generator/     Medium hero + inline (16:9 + 4:3)
+│   ├── linkedin-image-generator/   LinkedIn cover (1.91:1) OR carousel (1:1, 5-10 slides)
+│   ├── twitter-image-generator/    Tweet image (16:9) + thread card (1:1)
+│   ├── instagram-image-generator/  Feed (1:1), Story/Reel (9:16), carousel
+│   ├── meta-image-generator/       Feed image (1.91:1) + event cover
+│   └── infographic-generator/      Pinterest pins, data posters (OpenAI gpt-image-2)
+├── bin/                            suite.sh controller for /suite command
+├── commands/                       Claude Code slash command definitions
+├── install.sh                      Claude Code solo installer
+├── install-team.sh                 Claude Code team installer (staged + symlink)
+└── _templates/                     Shared templates (engine wrapper, etc.)
 ```
 
 ### Why this structure
@@ -65,25 +72,27 @@ Instagram's "consistency mode" is the unusual one: after 3 posts using a similar
 
 ## Install
 
-### Solo install (single user, every platform active)
+The suite is authored to the [agentskills.io](https://agentskills.io/specification) open standard. The same SKILL.md files run unchanged in Claude Code, Hermes Agent, Codex CLI, Gemini CLI, and Cursor. Three install paths:
+
+### Claude Code, solo install
 
 ```bash
 cd /path/to/content-image-suite
 ./install.sh
 ```
 
-This copies all seven skill folders into `~/.claude/skills/`, backing up any existing installations to a timestamped folder.
+Copies every skill folder from `skills/` into `~/.claude/skills/`, backing up any existing installations to a timestamped folder.
 
-### Team install (staged, selectable per-user)
+### Claude Code, team install (staged + selectable activation)
 
 ```bash
 cd /path/to/content-image-suite
-./install-team.sh                       # stage everything, activate core only
-./install-team.sh --activate all        # stage + activate everything
+./install-team.sh                                # stage everything, activate core only
+./install-team.sh --activate all                 # stage + activate everything
 ./install-team.sh --activate "linkedin,medium"   # stage + activate those two
 ```
 
-This stages every skill into `~/.claude/skills-suite/` and symlinks only the active ones into `~/.claude/skills/`. Token cost at session start scales with what's symlinked, not what's staged. Use the `/suite` slash command to toggle activation later without reinstalling:
+Stages every skill into `~/.claude/skills-suite/` and symlinks only the active ones into `~/.claude/skills/`. Session-start token cost scales with what's symlinked, not what's staged. Toggle later without reinstalling:
 
 ```
 /suite list                # show staged vs active + token cost
@@ -92,25 +101,53 @@ This stages every skill into `~/.claude/skills-suite/` and symlinks only the act
 /suite enable-all          # activate every staged skill
 ```
 
+### Hermes Agent
+
+The repo is structured as a Hermes "tap" — a curated GitHub-hosted skill collection. Add it once and Hermes treats the contents of `skills/` as installable skills:
+
+```
+hermes skills tap add varuntyagi83/content-image-suite
+hermes skills install varuntyagi83/visual-engine
+hermes skills install varuntyagi83/linkedin-image-generator
+# ...etc, install whichever platforms you actually use
+```
+
+Hermes lazy-loads skill bodies on demand (its built-in progressive disclosure), so the equivalent of the `/suite` activation control isn't needed. The runtime already pays only the metadata cost for skills it doesn't invoke.
+
+### Compatibility matrix
+
+| Capability | Claude Code | Hermes Agent | Codex / Gemini / Cursor |
+|---|---|---|---|
+| Platform image generation (LinkedIn, Medium, Twitter, Instagram, Meta) | yes | yes | yes (via skill) |
+| Infographic generation (OpenAI gpt-image-2) | yes | yes | yes |
+| Quality gate (Anthropic Haiku or OpenAI gpt-4o-mini) | yes | yes | yes |
+| Manifest concurrency: fcntl file lock | yes | yes | yes |
+| Manifest concurrency: SQLite (WAL + BEGIN IMMEDIATE) | yes | yes | yes |
+| `/suite` per-skill activation toggle | yes | n/a (runtime lazy-loads) | varies by host |
+| `metadata.hermes.requires_toolsets` conditional loading | n/a | yes | n/a |
+
+Engine resolution is runtime-aware via the `scripts/engine` wrapper inside each skill: it auto-detects whether the visual-engine sits under `~/.claude/skills/`, `~/.claude/skills-suite/`, `~/.hermes/skills/`, or alongside it via `$HERMES_SKILL_DIR`.
+
 ### Manifest backends
 
 Two storage modes for the cross-platform manifest:
 
-- **JSON** (default) — human-readable, single file. Concurrent writers serialise via an `fcntl.flock` sidecar lockfile on POSIX. Fine for solo and small-team use.
-- **SQLite** — pass a manifest path ending in `.db`, `.sqlite`, or `.sqlite3` and the engine routes through SQLite with WAL mode and `BEGIN IMMEDIATE` transactions. Use this for larger teams or when running on Windows (where the JSON lock is a no-op).
+- **JSON** (default): human-readable, single file. Concurrent writers serialise via an `fcntl.flock` sidecar lockfile on POSIX. Fine for solo and small-team use.
+- **SQLite**: pass a manifest path ending in `.db`, `.sqlite`, or `.sqlite3` and the engine routes through SQLite with WAL mode and `BEGIN IMMEDIATE` transactions. Use this for larger teams or when running on Windows (where the JSON lock is a no-op).
 
-Both backends expose the same API; you can switch by changing only the manifest path.
+Both backends expose the same API. Switch by changing only the manifest path.
 
 ### Manual install
 
 ```bash
-cp -r visual-engine ~/.claude/skills/
-cp -r content-image-orchestrator ~/.claude/skills/
-cp -r medium-image-generator ~/.claude/skills/
-cp -r linkedin-image-generator ~/.claude/skills/
-cp -r twitter-image-generator ~/.claude/skills/
-cp -r instagram-image-generator ~/.claude/skills/
-cp -r meta-image-generator ~/.claude/skills/
+cp -r skills/visual-engine ~/.claude/skills/
+cp -r skills/content-image-orchestrator ~/.claude/skills/
+cp -r skills/medium-image-generator ~/.claude/skills/
+cp -r skills/linkedin-image-generator ~/.claude/skills/
+cp -r skills/twitter-image-generator ~/.claude/skills/
+cp -r skills/instagram-image-generator ~/.claude/skills/
+cp -r skills/meta-image-generator ~/.claude/skills/
+cp -r skills/infographic-generator ~/.claude/skills/
 ```
 
 ### Setup

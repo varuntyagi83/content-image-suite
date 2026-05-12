@@ -47,21 +47,25 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# ----- Script directory -----
+# ----- Script directory + skills source root -----
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
+# As of the agentskills.io / Hermes-tap restructure, skill folders live under
+# skills/ at the repo root. Fall back to the legacy flat layout so older
+# checkouts still install cleanly.
+if [ -d "$SCRIPT_DIR/skills" ]; then
+    SKILLS_SRC="$SCRIPT_DIR/skills"
+else
+    SKILLS_SRC="$SCRIPT_DIR"
+fi
+
 # ----- Detect a double-nested folder (common zip extraction mistake) -----
-# If the user extracted the zip such that this script sits inside an extra
-# folder layer, all skill folders will be missing here. Detect and explain.
-if [ ! -d "$SCRIPT_DIR/visual-engine" ]; then
-    echo "${RED}ERROR: install.sh is not in the same folder as the skills.${NC}" >&2
+if [ ! -d "$SKILLS_SRC/visual-engine" ]; then
+    echo "${RED}ERROR: install.sh cannot find the skill folders.${NC}" >&2
     echo "" >&2
-    echo "Expected to find these folders next to install.sh:" >&2
-    echo "  visual-engine/, content-image-orchestrator/," >&2
-    echo "  medium-image-generator/, linkedin-image-generator/," >&2
-    echo "  twitter-image-generator/, instagram-image-generator/," >&2
-    echo "  meta-image-generator/" >&2
+    echo "Expected: $SKILLS_SRC/visual-engine" >&2
+    echo "Skills source root: $SKILLS_SRC" >&2
     echo "" >&2
     echo "If you extracted the zip into a nested folder, cd one level deeper." >&2
     echo "Current directory: $SCRIPT_DIR" >&2
@@ -105,7 +109,7 @@ echo ""
 echo "${BLUE}Verifying source skills...${NC}"
 MISSING=""
 for skill in $SKILLS; do
-    if [ ! -d "$SCRIPT_DIR/$skill" ]; then
+    if [ ! -d "$SKILLS_SRC/$skill" ]; then
         MISSING="$MISSING $skill"
     fi
 done
@@ -152,7 +156,7 @@ echo ""
 echo "${BLUE}Installing skills...${NC}"
 for skill in $SKILLS; do
     if [ $DRY_RUN -eq 0 ]; then
-        cp -R "$SCRIPT_DIR/$skill" "$INSTALL_DIR/$skill"
+        cp -R "$SKILLS_SRC/$skill" "$INSTALL_DIR/$skill"
         # Clean any pyc/cache files that came along.
         find "$INSTALL_DIR/$skill" -name "__pycache__" -type d 2>/dev/null | \
             while read d; do rm -rf "$d"; done
