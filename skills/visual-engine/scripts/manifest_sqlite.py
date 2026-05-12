@@ -173,7 +173,25 @@ def load_manifest(path: Path, auto_create: bool = True) -> tuple[dict[str, Any],
 
 
 def save_manifest(path: Path, manifest: dict[str, Any]) -> None:
-    """Persist the full manifest. Wraps everything in a single transaction."""
+    """Persist the manifest using per-piece upserts.
+
+    Concurrency semantics:
+
+    Each call serialises under SQLite's BEGIN IMMEDIATE, so writes never
+    overlap. Crucially, we DO NOT wipe-and-rewrite the content_pieces
+    table. Earlier versions did, which created a last-writer-wins bug:
+    two concurrent processes would each load the manifest, modify it
+    locally, then DELETE+INSERT inside their own transaction, with the
+    later writer overwriting the earlier writer's additions.
+
+    The fix is per-piece upsert (INSERT OR REPLACE on the unique slug).
+    Each writer touches only the rows it actually changed. Pieces added
+    by other writers between this writer's load and save remain in place.
+
+    Deletion semantics: the engine has no piece-delete API, so we never
+    need to remove rows here. If a future API needs to delete pieces,
+    add an explicit delete call that runs inside its own transaction.
+    """
     now = datetime.now(timezone.utc).isoformat()
     manifest["updated_at"] = now
 
@@ -195,10 +213,9 @@ def save_manifest(path: Path, manifest: dict[str, Any]) -> None:
                     (key, value),
                 )
 
-            # Replace all content pieces. For small manifests (under a few
-            # thousand pieces) a wipe-and-rewrite is fine and keeps the
-            # in-memory edit semantics identical to the JSON backend.
-            conn.execute("DELETE FROM content_pieces")
+            # Per-piece upsert. INSERT OR REPLACE keyed on canonical_slug
+            # (UNIQUE constraint) and content_id (PRIMARY KEY) means a
+            # concurrent writer's earlier inserts are preserved.
             for piece in pieces:
                 content_id = piece.get("content_id") or str(uuid.uuid4())
                 slug = piece.get("canonical_slug") or ""
@@ -207,7 +224,11 @@ def save_manifest(path: Path, manifest: dict[str, Any]) -> None:
                 conn.execute(
                     "INSERT INTO content_pieces "
                     "(content_id, canonical_slug, data, first_seen_date, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?)",
+                    "VALUES (?, ?, ?, ?, ?) "
+                    "ON CONFLICT(canonical_slug) DO UPDATE SET "
+                    "  data = excluded.data, "
+                    "  first_seen_date = excluded.first_seen_date, "
+                    "  updated_at = excluded.updated_at",
                     (
                         content_id,
                         slug,
