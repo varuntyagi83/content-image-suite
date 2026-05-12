@@ -1,6 +1,16 @@
 ---
 name: medium-image-generator
 description: Generate hero and in-article images for Medium blog posts using Gemini Nano Banana Pro. Triggers on phrases like "make me a hero image for Medium", "generate Medium cover", "image for this Medium draft", "blog visuals for Medium", or whenever a user shares a Medium draft, file, URL, or title with bullets. Also triggers on iteration phrases like "make it darker", "redo the hero" when an image was previously generated. Part of the Content Image Suite, uses the shared visual-engine for rotation, palette, and prompt construction.
+license: Proprietary. Contact author for redistribution terms.
+compatibility: Designed for Claude Code or Hermes Agent. Requires Python 3.10+, fal.ai API key (FAL_KEY), optionally ANTHROPIC_API_KEY or OPENAI_API_KEY for the quality gate.
+metadata:
+  author: Raygency (Varun Tyagi)
+  version: "1.0.0"
+  hermes:
+    tags: [creative, blogging, image-generation, medium]
+    related_skills:
+      - content-image-orchestrator
+      - linkedin-image-generator
 ---
 
 # Medium Image Generator (v2)
@@ -9,8 +19,8 @@ Generate Medium-specific images using the shared visual-engine. Aggressive rotat
 
 ## Output formats
 
-- `hero` — 16:9 (1920×1080), the primary article cover
-- `inline_1`, `inline_2`, `inline_3` — 4:3 (1600×1200), section dividers (optional)
+- `hero`: 16:9 (1920×1080), the primary article cover
+- `inline_1`, `inline_2`, `inline_3`: 4:3 (1600×1200), section dividers (optional)
 
 ## When this skill triggers vs the orchestrator
 
@@ -25,7 +35,7 @@ If the user says only "make me a hero image for this draft" without specifying p
 
 The shared engine lives next to this skill in the suite. Find the engine CLI:
 
-- If installed via the bundle: `~/.claude/skills/visual-engine/scripts/engine.py`
+- Use this skill's own `scripts/engine` wrapper: `${HERMES_SKILL_DIR}/scripts/engine` in Hermes, or the absolute path to `scripts/engine` inside this skill's directory in Claude Code
 - The path is also discoverable via `find ~/.claude/skills -name engine.py -path '*/visual-engine/*'`
 
 The cross-platform manifest lives at: `<working-dir>/content-images/manifest.json` (default). If absent, the engine creates it automatically. Use `<working-dir>` of where Claude Code was launched.
@@ -33,7 +43,7 @@ The cross-platform manifest lives at: `<working-dir>/content-images/manifest.jso
 For backward compatibility: if `<working-dir>/medium-images/manifest.json` exists (old v1 location), migrate it once via:
 
 ```
-python <engine>/migrate_v1_to_v2.py <working-dir>/medium-images/manifest.json --output <working-dir>/content-images/manifest.json
+<engine>/migrate_v1_to_v2.py <working-dir>/medium-images/manifest.json --output <working-dir>/content-images/manifest.json
 ```
 
 Then continue using the v2 path.
@@ -43,7 +53,7 @@ Then continue using the v2 path.
 Before the first generation in this conversation, check the planned manifest path is sensible:
 
 ```bash
-python <engine>/engine.py path-check \
+<engine> path-check \
   --manifest <working-dir>/content-images/manifest.json
 ```
 
@@ -54,7 +64,7 @@ In that case, tell the user once:
 
 Wait for confirmation. If they give a new path, use it for the rest of the session. Don't ask again in this conversation.
 
-If `"suspicious": false`, proceed silently — no need to confirm with the user.
+If `"suspicious": false`, proceed silently: no need to confirm with the user.
 
 ### Step 2: Identify the input
 
@@ -73,7 +83,7 @@ The user gives a Medium draft in any of these forms:
 Before generating anything, check if this content already exists in the manifest:
 
 ```bash
-python <engine>/engine.py manifest find \
+<engine> manifest find \
   --manifest <working-dir>/content-images/manifest.json \
   --title "<the post title>" \
   --slug "<slugified title>" \
@@ -82,7 +92,7 @@ python <engine>/engine.py manifest find \
 
 If `matched: true` and the piece already has a Medium output, ask the user: "Looks like you've generated Medium images for this before. Regenerate (replaces them) or pick up where you left off?"
 
-If matched but Medium output is null, this means orchestrator or another platform skill registered the piece. Reuse the `shared_identity` from the matched piece — that's the locked style+palette.
+If matched but Medium output is null, this means orchestrator or another platform skill registered the piece. Reuse the `shared_identity` from the matched piece: that's the locked style+palette.
 
 ### Step 4: Extract the subject
 
@@ -94,14 +104,14 @@ A post is first-person if ANY of these are true:
 - It uses "I" repeatedly in the opening paragraph ("I built X", "I spent years", "I noticed")
 - It's a founder essay, a personal narrative, or a memoir of building something
 - The author is the protagonist of the story being told
-- It profiles a specific named individual ("How [Name] did Z") — the named person is the protagonist
+- It profiles a specific named individual ("How [Name] did Z"): the named person is the protagonist
 
 A post is conceptual/third-person if:
 - It's a how-to guide, a technical explainer, or an opinion piece without personal framing
 - It uses "you" or "we" or impersonal voice
-- The post is about an idea, system, or category — not about a person's experience
+- The post is about an idea, system, or category: not about a person's experience
 
-**Why this matters:** First-person posts need a *protagonist-centered subject* — a specific person with a face. Conceptual posts work fine with object-centered or scene-centered subjects.
+**Why this matters:** First-person posts need a *protagonist-centered subject*: a specific person with a face. Conceptual posts work fine with object-centered or scene-centered subjects.
 
 Common failure mode to avoid: extracting a conceptual subject ("a marketing desk", "a workflow") for a first-person post. This produces faceless images that drain the emotional voice. If the post says "I built X because I got tired of Y", the image should center the *narrator*, not the workflow.
 
@@ -120,14 +130,14 @@ For first-person posts, question 3's answer MUST describe the narrator/protagoni
 Bad first-person subject: "A marketing desk split between chaos and order."
 Good first-person subject: "A founder, mid-30s, focused expression, standing at the boundary between a chaotic five-screen workstation on the left and a single calm dashboard on the right."
 
-For conceptual posts, the subject can be a scene, object, or generic figure — no protagonist requirement.
+For conceptual posts, the subject can be a scene, object, or generic figure: no protagonist requirement.
 
 **Step 4c: Record the protagonist mode for Step 6.** If first-person, mode is `named`. If conceptual with no figure, mode is `none`. If conceptual with a generic figure, mode is `generic`. You'll pass this to `build-prompt` in Step 6.
 
 ### Step 5: Run rotation
 
 ```bash
-python <engine>/engine.py rotate \
+<engine> rotate \
   --manifest <working-dir>/content-images/manifest.json \
   --platform medium \
   --post-type <inferred type>
@@ -144,7 +154,7 @@ Pick the hero composition from `allowed_compositions["hero"]`. Prefer one that s
 Use the protagonist mode you recorded in Step 4c.
 
 ```bash
-python <engine>/engine.py build-prompt \
+<engine> build-prompt \
   --platform medium --format hero \
   --style <recommended_style> \
   --palette <recommended_palette> \
@@ -159,7 +169,7 @@ Returns `prompt`, `aspect_ratio`, `width`, `height`, `label_risk_detected`, `lab
 
 **If `label_risk_detected` is true:** the subject contained label-shaped phrasing. The engine has already prepended an aggressive no-text negative. Mention this casually to the user once:
 
-> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text still leaks into the image, we can rephrase the subject — see `subject-extraction.md` for visual proxies.
+> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text still leaks into the image, we can rephrase the subject: see `subject-extraction.md` for visual proxies.
 
 Then proceed to generation normally.
 
@@ -168,7 +178,7 @@ Then proceed to generation normally.
 If `FAL_KEY` is set:
 
 ```bash
-python <engine>/engine.py generate \
+<engine> generate \
   --prompt "<the prompt>" \
   --aspect 16:9 \
   --output <working-dir>/content-images/<slug>/hero.png
@@ -189,11 +199,11 @@ python <engine>/engine.py generate \
 
 The response includes `text_detection.passed` (bool) and `text_detection.words_found` (list). When `passed: false`, the OCR safety net found rendered text in the image. Surface this to the user:
 
-> Heads up: text rendering detected in this image — the OCR found words like `<list>`. Want me to regenerate? (I'll add a stronger no-text directive.)
+> Heads up: text rendering detected in this image: the OCR found words like `<list>`. Want me to regenerate? (I'll add a stronger no-text directive.)
 
 If user wants to regenerate: rebuild the prompt with the subject pre-rewritten (strip the textual cues you saw in the OCR output), then `generate --overwrite`.
 
-If `text_detection.status` is `"ocr_unavailable"`, OCR isn't installed on the user's machine — don't surface this as an error, just proceed silently. Tell the user once per session, only when they ask why text wasn't caught:
+If `text_detection.status` is `"ocr_unavailable"`, OCR isn't installed on the user's machine: don't surface this as an error, just proceed silently. Tell the user once per session, only when they ask why text wasn't caught:
 > The OCR safety net needs tesseract. Install with `brew install tesseract` and `pip install pytesseract pillow` if you want automatic text detection.
 
 If `FAL_KEY` is not set: fall back. Tell the user once "I'll show the prompt to paste into fal.ai or AI Studio," show the prompt formatted for copy, and treat it like generation succeeded for the conversation flow.
@@ -228,7 +238,7 @@ When user says "keep going":
 
 1. Reuse `style` and `palette` from the hero (visual continuity).
 2. Pick a different composition from `allowed_compositions["inline_1"]` (must differ from hero AND from any inline already done).
-3. Pick a different subject focus — a key concept, counterargument, transition moment.
+3. Pick a different subject focus: a key concept, counterargument, transition moment.
 4. Build prompt with `--format inline_1` (4:3, 1600×1200).
 5. Generate, show, ask.
 
@@ -240,7 +250,7 @@ Once user signals completion ("we're done"), call:
 
 ```bash
 # First, upsert the content piece (or just confirm if cross-session linked)
-python <engine>/engine.py manifest upsert \
+<engine> manifest upsert \
   --manifest <working-dir>/content-images/manifest.json \
   --title "<post title>" \
   --slug "<slug>" \
@@ -250,7 +260,7 @@ python <engine>/engine.py manifest upsert \
   --date <YYYY-MM-DD>
 
 # Then add the medium output
-python <engine>/engine.py manifest add-output \
+<engine> manifest add-output \
   --manifest <working-dir>/content-images/manifest.json \
   --slug "<slug>" \
   --platform medium \
@@ -278,8 +288,8 @@ The user must NEVER see:
 The engine returns structured errors. Translate them:
 - `rate_limit` → "fal.ai is busy, retrying in 5 seconds"
 - `policy_violation` → "Gemini rejected that prompt. Want to rephrase the subject?"
-- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key — check `FAL_KEY`"
-- `network` → "Couldn't reach fal.ai — check your connection"
+- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key: check `FAL_KEY`"
+- `network` → "Couldn't reach fal.ai: check your connection"
 - `download_failed` → "Generated, but the download failed. Retry?"
 - anything else → quote the message briefly and offer retry
 

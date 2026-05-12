@@ -1,6 +1,17 @@
 ---
 name: infographic-generator
 description: Use this skill when the user asks for an infographic, a Pinterest pin, a data poster, a stats graphic, a one-pager, or any "infographic-style" image with rendered text. Different from the other content-image-suite skills because it uses OpenAI gpt-image-2 (not Gemini) to get legible text rendering, and it produces vertical, square, or wide formats with real typography. Triggers on requests like "make an infographic of X", "Pinterest pin summarizing my post", "create a data graphic about Y", "one-pager for the announcement", or any image where text content is the point.
+license: Proprietary. Contact author for redistribution terms.
+compatibility: Designed for Claude Code or Hermes Agent. Requires Python 3.10+, fal.ai API key (FAL_KEY), optionally ANTHROPIC_API_KEY or OPENAI_API_KEY for the quality gate.
+metadata:
+  author: Raygency (Varun Tyagi)
+  version: "1.0.0"
+  hermes:
+    tags: [creative, data-visualization, image-generation, openai-gpt-image]
+    related_skills:
+      - content-image-orchestrator
+      - medium-image-generator
+      - linkedin-image-generator
 ---
 
 # Infographic Generator
@@ -10,9 +21,9 @@ description: Use this skill when the user asks for an infographic, a Pinterest p
 Generates infographics with legible, correctly-spelled text. Uses OpenAI gpt-image-2 (released April 21, 2026) instead of the Gemini backend that the other content-image-suite skills use, because gpt-image-2 is significantly better at rendering text.
 
 Three output formats are supported:
-- `pinterest_pin` — 1024x1536 (2:3 portrait). Pinterest, content marketing, vertical share. Default.
-- `square_card` — 1024x1024 (1:1). LinkedIn carousel slides, Instagram feed, single-stat callouts.
-- `landscape_poster` — 1536x1024 (3:2). Blog post embeds, presentation slides, wide data visualization.
+- `pinterest_pin`: 1024x1536 (2:3 portrait). Pinterest, content marketing, vertical share. Default.
+- `square_card`: 1024x1024 (1:1). LinkedIn carousel slides, Instagram feed, single-stat callouts.
+- `landscape_poster`: 1536x1024 (3:2). Blog post embeds, presentation slides, wide data visualization.
 
 The skill plugs into the shared content-image-suite manifest (`<working-dir>/content-images/manifest.json`), so when an infographic is paired with a Medium post, the style and palette can lock to the Medium post's `shared_identity`. When the infographic stands alone, it uses its own rotation.
 
@@ -22,15 +33,15 @@ The skill plugs into the shared content-image-suite manifest (`<working-dir>/con
 
 ```bash
 which python || echo "python not found"
-test -d ~/.claude/skills/visual-engine || echo "visual-engine skill not installed"
+test -x "${HERMES_SKILL_DIR:-$HOME/.claude/skills}/visual-engine/scripts/engine.py" 2>/dev/null || test -d ~/.claude/skills/visual-engine || echo "visual-engine skill not installed"
 ```
 
-The engine is at `~/.claude/skills/visual-engine/scripts/engine.py`. Reference it as `<engine>` below.
+`<engine>` = this skill's own `scripts/engine` wrapper, which auto-detects the shared visual-engine across runtimes. Resolve it as `${HERMES_SKILL_DIR}/scripts/engine` in Hermes Agent, or the absolute path to `scripts/engine` inside this skill's directory in Claude Code. Invoke directly: do not prefix with `python`.
 
 ### Step 2: Confirm the working directory and manifest location
 
 ```bash
-python <engine>/engine.py path-check \
+<engine> path-check \
   --manifest <working-dir>/content-images/manifest.json
 ```
 
@@ -39,7 +50,7 @@ If `status: "suspicious_location"`, announce the path to the user and ask whethe
 ### Step 3: Confirm there's no parent post conflict
 
 ```bash
-python <engine>/engine.py manifest find \
+<engine> manifest find \
   --manifest <working-dir>/content-images/manifest.json \
   --title "<the post title or topic>" \
   --slug "<slugified title>" \
@@ -47,9 +58,9 @@ python <engine>/engine.py manifest find \
 ```
 
 Three outcomes:
-- `matched: false` — the infographic is standalone or new. Continue with fresh rotation.
-- `matched: true` with an existing infographic output — ask: "You've generated an infographic for this before. Regenerate or pick up where you left off?"
-- `matched: true` but no infographic output yet (only Medium/LinkedIn/etc) — **reuse the shared_identity** so the infographic visually matches the parent piece.
+- `matched: false`: the infographic is standalone or new. Continue with fresh rotation.
+- `matched: true` with an existing infographic output: ask: "You've generated an infographic for this before. Regenerate or pick up where you left off?"
+- `matched: true` but no infographic output yet (only Medium/LinkedIn/etc): **reuse the shared_identity** so the infographic visually matches the parent piece.
 
 ### Step 4: Extract the subject (uses infographic-specific protocol)
 
@@ -75,7 +86,7 @@ The structured format matters: gpt-image-2 follows explicit prompts better than 
 ### Step 5: Run rotation
 
 ```bash
-python <engine>/engine.py rotate \
+<engine> rotate \
   --manifest <working-dir>/content-images/manifest.json \
   --platform infographic \
   --post-type <inferred type>
@@ -86,10 +97,10 @@ python <engine>/engine.py rotate \
 Returns: `recommended_style`, `recommended_palette`, `allowed_compositions[<format>]`, `forbidden_themes`.
 
 The four infographic styles are:
-- `infographic-modern` — clean sans-serif, geometric icons, whitespace-led. Default for product/tech topics.
-- `infographic-editorial` — magazine-style with serif headlines, illustrative supporting elements. Best for essays.
-- `infographic-tech` — dashboard-inspired, KPI cards, accent glows. Best for SaaS metrics, technical announcements.
-- `infographic-classic` — Tufte-tradition, restrained, serif display. Best for research, academic, comparison data.
+- `infographic-modern`: clean sans-serif, geometric icons, whitespace-led. Default for product/tech topics.
+- `infographic-editorial`: magazine-style with serif headlines, illustrative supporting elements. Best for essays.
+- `infographic-tech`: dashboard-inspired, KPI cards, accent glows. Best for SaaS metrics, technical announcements.
+- `infographic-classic`: Tufte-tradition, restrained, serif display. Best for research, academic, comparison data.
 
 Pick a composition from `allowed_compositions[pinterest_pin]` (or `square_card` / `landscape_poster`) that suits the data shape. Default is `vertical-stack` for pins.
 
@@ -98,7 +109,7 @@ Pick a composition from `allowed_compositions[pinterest_pin]` (or `square_card` 
 Important: pass `--text-mode allow` so the engine skips the anti-text safety net. Text IS the content here.
 
 ```bash
-python <engine>/engine.py build-prompt \
+<engine> build-prompt \
   --platform infographic --format pinterest_pin \
   --style <recommended_style> \
   --palette <recommended_palette> \
@@ -116,7 +127,7 @@ Returns `prompt`, `aspect_ratio`, `width`, `height`, and `text_mode: "allow"`.
 Important: pass `--provider openai-gpt-image` so the engine uses gpt-image-2 instead of fal/Gemini. Set `--text-mode allow` so the OCR check reports words informationally rather than failing on them.
 
 ```bash
-python <engine>/engine.py generate \
+<engine> generate \
   --provider openai-gpt-image \
   --prompt "<from Step 6>" \
   --aspect 2:3 \
@@ -128,9 +139,9 @@ python <engine>/engine.py generate \
 ```
 
 Quality cost reference (per OpenAI):
-- `low` ~$0.005 — fast drafts, thumbnails
-- `medium` ~$0.041 — default, good for most uses (Pinterest pin native size)
-- `high` ~$0.165 — client deliverables, premium output
+- `low` ~$0.005: fast drafts, thumbnails
+- `medium` ~$0.041: default, good for most uses (Pinterest pin native size)
+- `high` ~$0.165: client deliverables, premium output
 
 Requirements:
 - `OPENAI_API_KEY` must be set
@@ -153,7 +164,7 @@ If the visual layout is wrong (sections crammed, headline cut off):
 ### Step 9: Save to manifest
 
 ```bash
-python <engine>/engine.py manifest add-output \
+<engine> manifest add-output \
   --manifest <working-dir>/content-images/manifest.json \
   --slug "<slug>" \
   --platform infographic \

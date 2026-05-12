@@ -1,6 +1,20 @@
 ---
 name: content-image-orchestrator
 description: Generate coordinated images across multiple platforms (Medium, LinkedIn, Twitter, Instagram, Meta) from a single piece of source content. Triggers when the user names 2+ platforms ("Medium and LinkedIn", "all platforms", "everywhere"), wants a coordinated image set for an article, or says they're cross-posting. Reads source once, extracts subject once, picks one style+palette for all chosen platforms, generates each in sequence with iteration in between. OPTIONAL: every platform skill works without this.
+license: Proprietary. Contact author for redistribution terms.
+compatibility: Designed for Claude Code or Hermes Agent. Requires Python 3.10+, fal.ai API key (FAL_KEY), optionally ANTHROPIC_API_KEY or OPENAI_API_KEY for the quality gate.
+metadata:
+  author: Raygency (Varun Tyagi)
+  version: "1.0.0"
+  hermes:
+    tags: [creative, social-media, image-generation, orchestration]
+    related_skills:
+      - medium-image-generator
+      - linkedin-image-generator
+      - twitter-image-generator
+      - instagram-image-generator
+      - meta-image-generator
+      - infographic-generator
 ---
 
 # Content Image Orchestrator
@@ -11,14 +25,14 @@ The whole job is: one subject + one style + one palette → N images, one per pl
 
 ## Engine path
 
-`<engine>` = `~/.claude/skills/visual-engine/scripts/engine.py`
+`<engine>` = this skill's own `scripts/engine` wrapper, which auto-detects the shared visual-engine across runtimes. Resolve it as `${HERMES_SKILL_DIR}/scripts/engine` in Hermes Agent, or the absolute path to `scripts/engine` inside this skill's directory in Claude Code. Invoke directly: do not prefix with `python`.
 
 `<manifest>` = `<working-dir>/content-images/manifest.json` (auto-created if missing).
 
 ## Path check (once per session, before first generation)
 
 ```bash
-python <engine> path-check --manifest <manifest>
+<engine> path-check --manifest <manifest>
 ```
 
 If response has `"suspicious": true`, tell the user once:
@@ -57,14 +71,14 @@ This decision changes whether Gemini renders a recognizable face or defaults to 
 ### 2. Resolve the platform list
 
 If the user named the platforms explicitly, use that list. If they said "all" or "everywhere", use all 5. If ambiguous, ask once:
-> Which platforms — Medium, LinkedIn, Twitter, Instagram, Meta? You can pick any combination.
+> Which platforms: Medium, LinkedIn, Twitter, Instagram, Meta? You can pick any combination.
 
 Then lock the list.
 
 ### 3. Cross-session linking
 
 ```bash
-python <engine> manifest find --manifest <manifest> \
+<engine> manifest find --manifest <manifest> \
   --title "<title>" --slug "<slugified-title>" --threshold 0.80
 ```
 
@@ -76,12 +90,12 @@ If no match: new content, continue.
 
 ### 4. Extract the subject once
 
-Apply `<engine_dir>/references/subject-extraction.md` — the 3-question protocol. This subject anchors EVERY platform's primary image. Variety per platform comes from composition and format, not subject.
+Apply `<engine_dir>/references/subject-extraction.md`: the 3-question protocol. This subject anchors EVERY platform's primary image. Variety per platform comes from composition and format, not subject.
 
 ### 5. Compute shared identity
 
 ```bash
-python <engine> shared-identity --manifest <manifest> \
+<engine> shared-identity --manifest <manifest> \
   --platforms <comma-separated> --post-type <type>
 ```
 
@@ -92,7 +106,7 @@ If Instagram is in the platform list and the engine reports `consistency_locked:
 ### 6. Register the content piece
 
 ```bash
-python <engine> manifest upsert --manifest <manifest> \
+<engine> manifest upsert --manifest <manifest> \
   --title "<title>" --slug "<slug>" \
   --style <style> --palette <palette> \
   --themes "<comma,separated,themes>"
@@ -112,7 +126,7 @@ For each platform `pid`:
 
 a) Rotation with locks:
 ```bash
-python <engine> rotate --manifest <manifest> --platform <pid> \
+<engine> rotate --manifest <manifest> --platform <pid> \
   --post-type <type> --locked-style <style> --locked-palette <palette>
 ```
 
@@ -125,34 +139,34 @@ c) Pick composition from `allowed_compositions[format-name]`.
 
 d) Build prompt:
 ```bash
-python <engine> build-prompt --platform <pid> --format <format> \
+<engine> build-prompt --platform <pid> --format <format> \
   --style <style> --palette <palette> \
   --composition <comp> --subject "<subject>"
 ```
 
 e) Generate:
 ```bash
-python <engine> generate \
+<engine> generate \
   --prompt "<prompt>" --aspect <ratio> \
   --output <working-dir>/content-images/<slug>/<pid>_<format>.png
 ```
 
 **Handle three response statuses:**
 - `"status": "ok"` → image generated, proceed to (f).
-- `"status": "file_exists"` (exit 4) — output exists from a previous session. Ask:
+- `"status": "file_exists"` (exit 4): output exists from a previous session. Ask:
   > Already have a `<pid>` image for this from `<modified_at>`. Use that, or generate fresh?
 
   Use existing → proceed to (f) using the existing path. Generate fresh → re-run with `--overwrite`.
 - `"status": "error"` → translate per the Error code translation table at the bottom.
 
-The engine remaps unsupported ratios (e.g. LinkedIn's 1.91:1 → 16:9). The `generate` response includes `aspect_ratio_was_remapped: true` in those cases — mention it casually: "LinkedIn doesn't take 1.91:1 exactly, generated at 16:9 — works fine for the LinkedIn preview."
+The engine remaps unsupported ratios (e.g. LinkedIn's 1.91:1 → 16:9). The `generate` response includes `aspect_ratio_was_remapped: true` in those cases: mention it casually: "LinkedIn doesn't take 1.91:1 exactly, generated at 16:9: works fine for the LinkedIn preview."
 
 f) Show one summary line + image + one question:
 > LinkedIn cover ready. Continue to Twitter, tweak this, or stop here?
 
 g) On approval, save:
 ```bash
-python <engine> manifest add-output --manifest <manifest> \
+<engine> manifest add-output --manifest <manifest> \
   --slug <slug> --platform <pid> --format <format> \
   --compositions "<slot>=<comp>" \
   --prompts "<slot>=<full prompt>" \
@@ -164,7 +178,7 @@ h) Move to next platform.
 ### 9. Multi-slide modes (carousels)
 
 For LinkedIn or Instagram carousel mode:
-- Pick the slide count (or ask: "How many slides?" — default 6).
+- Pick the slide count (or ask: "How many slides?": default 6).
 - Plan briefly (internally, don't narrate): hook → 3-7 elaborations → payoff.
 - For each slide pick a different composition AND a different subject focus.
 - Generate slides one at a time, with feedback after each.
@@ -196,8 +210,8 @@ Ask one short question for these only:
 - Cross-session match in the 0.80-0.95 range (confirm: "Same as your earlier post X?")
 
 Don't ask:
-- If the user named specific platforms — use that list
-- If only one platform — defer to that platform's skill instead
+- If the user named specific platforms: use that list
+- If only one platform: defer to that platform's skill instead
 - About style or palette unless they ask
 - About cross-session links above 0.95 confidence (just use it)
 
@@ -218,23 +232,23 @@ That's the whole UX surface. The orchestrator is coordination, not narration.
 ## Protagonist mode (build-prompt)
 
 When building prompts, pass `--protagonist-mode` based on the source post:
-- `named` — first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
-- `generic` — posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
-- `none` — pure object/scene images with no human figure.
-- `auto` (default) — heuristic detection from the subject string.
+- `named`: first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
+- `generic`: posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
+- `none`: pure object/scene images with no human figure.
+- `auto` (default): heuristic detection from the subject string.
 
 For named-protagonist posts, also write the subject explicitly: include age range, expression, and an identifying gesture ("a founder, mid-30s, focused expression" not "a marketer"). The face-guidance directive in the prompt depends on the subject naming a person.
 
-The build-prompt response includes `protagonist_mode_resolved` — if it shows "named", the prompt now requests a clear visible face.
+The build-prompt response includes `protagonist_mode_resolved`: if it shows "named", the prompt now requests a clear visible face.
 
 ## Label-risk handling (applies to every build-prompt call)
 
 `build-prompt` returns two fields: `label_risk_detected` (bool) and `label_risk_reason` (str).
 
-When `label_risk_detected: true` — the subject has label-shaped phrasing (comma-separated capitalized phrases, quoted text, or multiple short label-like segments) that Gemini will likely render as visible text. The engine has already prepended an aggressive no-text negative.
+When `label_risk_detected: true`: the subject has label-shaped phrasing (comma-separated capitalized phrases, quoted text, or multiple short label-like segments) that Gemini will likely render as visible text. The engine has already prepended an aggressive no-text negative.
 
 Mention this casually to the user once per session:
-> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text leaks anyway, we can rephrase — see the visual proxies section in `subject-extraction.md`.
+> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text leaks anyway, we can rephrase: see the visual proxies section in `subject-extraction.md`.
 
 Then proceed. If text still appears in the generated image, the fix is on the subject side: rephrase the labels as a continuous scene or use visual proxies.
 
@@ -242,16 +256,16 @@ Then proceed. If text still appears in the generated image, the fix is on the su
 ## Text detection (post-generation safety net)
 
 Every successful `generate` response includes a `text_detection` field with:
-- `passed` (bool) — true if OCR found no rendered text
-- `words_found` (list) — what words OCR detected, if any
-- `status` — "ok", "text_detected", or "ocr_unavailable"
+- `passed` (bool): true if OCR found no rendered text
+- `words_found` (list): what words OCR detected, if any
+- `status`: "ok", "text_detected", or "ocr_unavailable"
 
 When `passed: false`, the image likely has rendered text (a clock face, a folder label, a sign). Surface to the user:
 > OCR detected text in this image: `<words>`. Want me to regenerate with a stronger no-text directive?
 
 If user agrees, re-run `generate` with `--overwrite`. The engine will apply more aggressive subject rewriting on the retry.
 
-When `status: ocr_unavailable`, the user does not have tesseract installed. Do not flag this — proceed silently. Only mention if user explicitly asks why text was not caught:
+When `status: ocr_unavailable`, the user does not have tesseract installed. Do not flag this: proceed silently. Only mention if user explicitly asks why text was not caught:
 > The OCR safety net needs tesseract. `brew install tesseract && pip install pytesseract pillow` enables it.
 
 ## Errors
@@ -259,8 +273,8 @@ When `status: ocr_unavailable`, the user does not have tesseract installed. Do n
 The engine returns structured errors. Translate them:
 - `rate_limit` → "fal.ai is busy, retrying in 5 seconds"
 - `policy_violation` → "Gemini rejected that prompt as borderline. Want to rephrase the subject?"
-- `auth` → "fal.ai isn't accepting the key — check `FAL_KEY` is set"
+- `auth` → "fal.ai isn't accepting the key: check `FAL_KEY` is set"
 - `fal_key_missing` → same
-- `network` → "Couldn't reach fal.ai — check your connection"
+- `network` → "Couldn't reach fal.ai: check your connection"
 - `download_failed` → "Image generated but couldn't download. Try once more?"
 - anything else → quote the message briefly and offer to retry

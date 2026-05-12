@@ -1,6 +1,16 @@
 ---
 name: linkedin-image-generator
-description: Generate LinkedIn images — single covers (1.91:1) or multi-slide carousels (1:1, 5-10 slides). Triggers on "LinkedIn image", "LinkedIn carousel", "image for my LinkedIn post", "tutorial carousel from this article", or when a user shares a LinkedIn post draft. Maps post types — Tutorial/step-by-step → isometric carousel, Comparison/X vs Y → minimalist, Hot take → neon-tech or editorial. Mobile-thumbnail-aware. Uses the shared visual-engine.
+description: Generate LinkedIn images: single covers (1.91:1) or multi-slide carousels (1:1, 5-10 slides). Triggers on "LinkedIn image", "LinkedIn carousel", "image for my LinkedIn post", "tutorial carousel from this article", or when a user shares a LinkedIn post draft. Maps post types: Tutorial/step-by-step → isometric carousel, Comparison/X vs Y → minimalist, Hot take → neon-tech or editorial. Mobile-thumbnail-aware. Uses the shared visual-engine.
+license: Proprietary. Contact author for redistribution terms.
+compatibility: Designed for Claude Code or Hermes Agent. Requires Python 3.10+, fal.ai API key (FAL_KEY), optionally ANTHROPIC_API_KEY or OPENAI_API_KEY for the quality gate.
+metadata:
+  author: Raygency (Varun Tyagi)
+  version: "1.0.0"
+  hermes:
+    tags: [creative, social-media, image-generation, linkedin]
+    related_skills:
+      - content-image-orchestrator
+      - medium-image-generator
 ---
 
 # LinkedIn Image Generator
@@ -9,8 +19,8 @@ LinkedIn output: a single cover OR a multi-slide carousel. Both modes use the sa
 
 ## Formats
 
-- `cover` — 1.91:1 (1200×627), default for single-image posts. The engine generates at 16:9 (closest supported by fal.ai) and the LinkedIn preview crops slightly.
-- `carousel_slide` — 1:1 (1080×1080), one slide of a 5-10 slide carousel.
+- `cover`: 1.91:1 (1200×627), default for single-image posts. The engine generates at 16:9 (closest supported by fal.ai) and the LinkedIn preview crops slightly.
+- `carousel_slide`: 1:1 (1080×1080), one slide of a 5-10 slide carousel.
 
 ## Post-type → style defaults
 
@@ -28,12 +38,12 @@ Recommendations, not constraints. User preference wins.
 
 ## Engine path
 
-`<engine>` = `~/.claude/skills/visual-engine/scripts/engine.py`
+`<engine>` = this skill's own `scripts/engine` wrapper, which auto-detects the shared visual-engine across runtimes. Resolve it as `${HERMES_SKILL_DIR}/scripts/engine` in Hermes Agent, or the absolute path to `scripts/engine` inside this skill's directory in Claude Code. Invoke directly: do not prefix with `python`.
 
 ## Path check (once per session, before first generation)
 
 ```bash
-python <engine> path-check --manifest <working-dir>/content-images/manifest.json
+<engine> path-check --manifest <working-dir>/content-images/manifest.json
 ```
 
 If response has `"suspicious": true`, tell the user once:
@@ -82,7 +92,7 @@ For carousel mode, also ask: "How many slides?" (default 6).
 ### 3. Cross-session linking
 
 ```bash
-python <engine> manifest find --manifest <manifest> \
+<engine> manifest find --manifest <manifest> \
   --title "<title>" --slug "<slugified>" --threshold 0.80
 ```
 
@@ -95,7 +105,7 @@ Apply `<engine_dir>/references/subject-extraction.md`. For carousels, the subjec
 ### 5. Run rotation
 
 ```bash
-python <engine> rotate --manifest <manifest> --platform linkedin \
+<engine> rotate --manifest <manifest> --platform linkedin \
   --post-type <tutorial|comparison|hot-take|personal|data> \
   [--locked-style ...] [--locked-palette ...]
 ```
@@ -108,20 +118,20 @@ a) Pick composition from `allowed_compositions[cover]`.
 
 b) Build prompt:
 ```bash
-python <engine> build-prompt --platform linkedin --format cover \
+<engine> build-prompt --platform linkedin --format cover \
   --style <picked> --palette <picked> \
   --composition <comp> --subject "<subject>"
 ```
 
 c) Generate:
 ```bash
-python <engine> generate --prompt "<...>" --aspect 1.91:1 \
+<engine> generate --prompt "<...>" --aspect 1.91:1 \
   --output <working-dir>/content-images/<slug>/linkedin_cover.png
 ```
 
 **Handle three response statuses:**
 - `"status": "ok"` → image generated, proceed to show + ask.
-- `"status": "file_exists"` (exit 4) — output already exists. Ask:
+- `"status": "file_exists"` (exit 4): output already exists. Ask:
   > Already generated this on `<modified_at>`. Use that one, or regenerate?
 
   Use existing → proceed to show + ask. Regenerate → re-run with `--overwrite`.
@@ -134,7 +144,7 @@ d) Show one summary line + image + ask:
 
 e) On approval, save:
 ```bash
-python <engine> manifest add-output --manifest <manifest> \
+<engine> manifest add-output --manifest <manifest> \
   --slug <slug> --platform linkedin --format cover \
   --compositions "cover=<comp>" \
   --prompts "cover=<full prompt>" \
@@ -145,7 +155,7 @@ python <engine> manifest add-output --manifest <manifest> \
 
 a) Pick ONE style + ONE palette for the entire carousel (visual coherence matters more here than for single covers).
 
-b) Plan the slide structure internally — don't narrate it to the user:
+b) Plan the slide structure internally: don't narrate it to the user:
 - Slide 1: hook / question / promise
 - Slide 2: setup / context
 - Slides 3 through N-1: the content (steps, comparison points, argument beats)
@@ -157,12 +167,12 @@ c) For each slide, pick a different composition. Order suggestion:
 - Middle slides: vary across remaining compositions
 - Last slide: `centered-subject` (anchor the takeaway)
 
-d) For each slide, pick a different subject focus — that slide's specific content, not a repeat of slide 1.
+d) For each slide, pick a different subject focus: that slide's specific content, not a repeat of slide 1.
 
 e) Generate slides ONE AT A TIME, not in a batch. After each slide:
 > Slide 1/6 ready: <one-line summary>. Continue, tweak this slide, or stop?
 
-This is intentional — carousels are expensive to regenerate if you only spot the issue after slide 10.
+This is intentional: carousels are expensive to regenerate if you only spot the issue after slide 10.
 
 f) Iteration vocabulary additions for carousels:
 - "More variation" → re-pick compositions to maximize differences between slides
@@ -173,7 +183,7 @@ f) Iteration vocabulary additions for carousels:
 
 g) On all-slides-approved, save:
 ```bash
-python <engine> manifest add-output --manifest <manifest> \
+<engine> manifest add-output --manifest <manifest> \
   --slug <slug> --platform linkedin --format carousel_slide \
   --compositions "slide_1=...|||slide_2=...|||..." \
   --prompts "slide_1=...|||slide_2=...|||..." \
@@ -208,20 +218,20 @@ User sees: one-line plan, the image (or each slide), one feedback question after
 ## Protagonist mode (build-prompt)
 
 When building prompts, pass `--protagonist-mode` based on the source post:
-- `named` — first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
-- `generic` — posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
-- `none` — pure object/scene images with no human figure.
-- `auto` (default) — heuristic detection from the subject string.
+- `named`: first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
+- `generic`: posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
+- `none`: pure object/scene images with no human figure.
+- `auto` (default): heuristic detection from the subject string.
 
 For named-protagonist posts, also write the subject explicitly: include age range, expression, and an identifying gesture ("a founder, mid-30s, focused expression" not "a marketer"). The face-guidance directive in the prompt depends on the subject naming a person.
 
-The build-prompt response includes `protagonist_mode_resolved` — if it shows "named", the prompt now requests a clear visible face.
+The build-prompt response includes `protagonist_mode_resolved`: if it shows "named", the prompt now requests a clear visible face.
 
 ## Errors
 
 Translate engine error codes:
 - `policy_violation` → "Gemini rejected the prompt. Want to rephrase the subject?"
-- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key — check `FAL_KEY`"
+- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key: check `FAL_KEY`"
 - `rate_limit` → "fal.ai is busy, retrying in 5 seconds"
-- `network` → "Couldn't reach fal.ai — check your connection"
+- `network` → "Couldn't reach fal.ai: check your connection"
 - anything else → quote briefly, offer retry

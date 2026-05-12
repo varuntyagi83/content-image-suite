@@ -1,16 +1,25 @@
 ---
 name: twitter-image-generator
 description: Generate single tweet images and thread cards for Twitter/X using Gemini Nano Banana Pro. Triggers on phrases like "make me a tweet image", "Twitter card for this thread", "X image for this post", "image for my tweet thread", or whenever a user asks for visuals tied to Twitter or X. Single-image (16:9) and thread-anchor (1:1) supported. Mobile-thumbnail-critical: prompts optimized for small-screen readability. Light rotation (Twitter is ephemeral). Part of the Content Image Suite, uses the shared visual-engine.
+license: Proprietary. Contact author for redistribution terms.
+compatibility: Designed for Claude Code or Hermes Agent. Requires Python 3.10+, fal.ai API key (FAL_KEY), optionally ANTHROPIC_API_KEY or OPENAI_API_KEY for the quality gate.
+metadata:
+  author: Raygency (Varun Tyagi)
+  version: "1.0.0"
+  hermes:
+    tags: [creative, social-media, image-generation, twitter, x]
+    related_skills:
+      - content-image-orchestrator
 ---
 
 # Twitter/X Image Generator
 
-Twitter is ephemeral and mobile-first. The skill leans toward simple, high-contrast visuals that work at thumbnail size. Rotation is light (style window 1, palette 2, theme 1) — the Twitter feed forgets fast.
+Twitter is ephemeral and mobile-first. The skill leans toward simple, high-contrast visuals that work at thumbnail size. Rotation is light (style window 1, palette 2, theme 1): the Twitter feed forgets fast.
 
 ## Output formats
 
-- `single` — 16:9 (1600×900), the default for a tweet with one image
-- `thread_card` — 1:1 (1080×1080), the anchor image of a multi-tweet thread
+- `single`: 16:9 (1600×900), the default for a tweet with one image
+- `thread_card`: 1:1 (1080×1080), the anchor image of a multi-tweet thread
 
 ## Style biases
 
@@ -49,12 +58,12 @@ This decision changes whether Gemini renders a recognizable face or defaults to 
 
 ### Step 1: Engine
 
-`<engine>` at `~/.claude/skills/visual-engine/scripts/engine.py`.
+`<engine>` = this skill's own `scripts/engine` wrapper, which auto-detects the shared visual-engine across runtimes. Resolve it as `${HERMES_SKILL_DIR}/scripts/engine` in Hermes Agent, or the absolute path to `scripts/engine` inside this skill's directory in Claude Code. Invoke directly without `python`.
 
 ## Path check (once per session, before first generation)
 
 ```bash
-python <engine> path-check --manifest <working-dir>/content-images/manifest.json
+<engine> path-check --manifest <working-dir>/content-images/manifest.json
 ```
 
 If response has `"suspicious": true`, tell the user once:
@@ -78,7 +87,7 @@ The image always anchors the tweet/thread, never decorates it. Small inputs → 
 
 ### Step 3: Cross-session linking
 
-Same as other platforms — fuzzy match the manifest. If the user says "for the same thing as my Medium post," look up that Medium post and lock to its `shared_identity`.
+Same as other platforms: fuzzy match the manifest. If the user says "for the same thing as my Medium post," look up that Medium post and lock to its `shared_identity`.
 
 ### Step 4: Subject extraction
 
@@ -87,14 +96,14 @@ Same protocol as Medium. The constraint: the subject must be **renderable at thu
 ### Step 5: Run rotation
 
 ```bash
-python <engine>/engine.py rotate \
+<engine> rotate \
   --manifest <working-dir>/content-images/manifest.json \
   --platform twitter \
   --post-type <type>
   [--locked-style ...] [--locked-palette ...]
 ```
 
-Twitter's `style_window=1` means only the most recent Twitter image is excluded — repetition over more posts is fine.
+Twitter's `style_window=1` means only the most recent Twitter image is excluded: repetition over more posts is fine.
 
 ### Step 6: Mode
 
@@ -106,7 +115,7 @@ If unclear, ask: "Single image (16:9) or thread anchor card (1:1)?"
 ### Step 7: Build prompt
 
 ```bash
-python <engine>/engine.py build-prompt \
+<engine> build-prompt \
   --platform twitter --format single \
   --style <picked> --palette <picked> \
   --composition <picked> \
@@ -118,7 +127,7 @@ The engine automatically adds Twitter's mobile-thumbnail-readability constraint 
 ### Step 8: Generate
 
 ```bash
-python <engine>/engine.py generate \
+<engine> generate \
   --prompt "<the prompt>" \
   --aspect <16:9 or 1:1> \
   --output <working-dir>/content-images/<slug>/twitter_<format>.png
@@ -147,7 +156,7 @@ Same vocabulary as other platforms. Twitter-specific tweaks:
 Single mode:
 
 ```bash
-python <engine>/engine.py manifest add-output \
+<engine> manifest add-output \
   --manifest <working-dir>/content-images/manifest.json \
   --slug "<slug>" --platform twitter --format single \
   --compositions "single=<comp>" \
@@ -159,7 +168,7 @@ End with: *"Saved. Ready to upload."*
 
 ## Multi-tweet thread special case
 
-If the user says "make a card for the start of this thread, and one image per tweet," that's NOT what this skill is for. Tell them: "Twitter doesn't really support multi-image threads where each tweet has a different image — you can attach up to 4 images to a single tweet. Want me to do a thread card (1 image) plus a 4-image grid?"
+If the user says "make a card for the start of this thread, and one image per tweet," that's NOT what this skill is for. Tell them: "Twitter doesn't really support multi-image threads where each tweet has a different image: you can attach up to 4 images to a single tweet. Want me to do a thread card (1 image) plus a 4-image grid?"
 
 If they confirm, generate one thread_card + up to 4 single-format images, varying compositions. Save them as `thread_card`, `tweet_1`, `tweet_2`, ... in the platform output.
 
@@ -173,23 +182,23 @@ Same rules as Medium: never expose manifest, rotation, JSON, engine, or tracebac
 ## Protagonist mode (build-prompt)
 
 When building prompts, pass `--protagonist-mode` based on the source post:
-- `named` — first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
-- `generic` — posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
-- `none` — pure object/scene images with no human figure.
-- `auto` (default) — heuristic detection from the subject string.
+- `named`: first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
+- `generic`: posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
+- `none`: pure object/scene images with no human figure.
+- `auto` (default): heuristic detection from the subject string.
 
 For named-protagonist posts, also write the subject explicitly: include age range, expression, and an identifying gesture ("a founder, mid-30s, focused expression" not "a marketer"). The face-guidance directive in the prompt depends on the subject naming a person.
 
-The build-prompt response includes `protagonist_mode_resolved` — if it shows "named", the prompt now requests a clear visible face.
+The build-prompt response includes `protagonist_mode_resolved`: if it shows "named", the prompt now requests a clear visible face.
 
 ## Label-risk handling (applies to every build-prompt call)
 
 `build-prompt` returns two fields: `label_risk_detected` (bool) and `label_risk_reason` (str).
 
-When `label_risk_detected: true` — the subject has label-shaped phrasing (comma-separated capitalized phrases, quoted text, or multiple short label-like segments) that Gemini will likely render as visible text. The engine has already prepended an aggressive no-text negative.
+When `label_risk_detected: true`: the subject has label-shaped phrasing (comma-separated capitalized phrases, quoted text, or multiple short label-like segments) that Gemini will likely render as visible text. The engine has already prepended an aggressive no-text negative.
 
 Mention this casually to the user once per session:
-> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text leaks anyway, we can rephrase — see the visual proxies section in `subject-extraction.md`.
+> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text leaks anyway, we can rephrase: see the visual proxies section in `subject-extraction.md`.
 
 Then proceed. If text still appears in the generated image, the fix is on the subject side: rephrase the labels as a continuous scene or use visual proxies.
 
@@ -197,16 +206,16 @@ Then proceed. If text still appears in the generated image, the fix is on the su
 ## Text detection (post-generation safety net)
 
 Every successful `generate` response includes a `text_detection` field with:
-- `passed` (bool) — true if OCR found no rendered text
-- `words_found` (list) — what words OCR detected, if any
-- `status` — "ok", "text_detected", or "ocr_unavailable"
+- `passed` (bool): true if OCR found no rendered text
+- `words_found` (list): what words OCR detected, if any
+- `status`: "ok", "text_detected", or "ocr_unavailable"
 
 When `passed: false`, the image likely has rendered text (a clock face, a folder label, a sign). Surface to the user:
 > OCR detected text in this image: `<words>`. Want me to regenerate with a stronger no-text directive?
 
 If user agrees, re-run `generate` with `--overwrite`. The engine will apply more aggressive subject rewriting on the retry.
 
-When `status: ocr_unavailable`, the user does not have tesseract installed. Do not flag this — proceed silently. Only mention if user explicitly asks why text was not caught:
+When `status: ocr_unavailable`, the user does not have tesseract installed. Do not flag this: proceed silently. Only mention if user explicitly asks why text was not caught:
 > The OCR safety net needs tesseract. `brew install tesseract && pip install pytesseract pillow` enables it.
 
 ## Error code translation
@@ -214,7 +223,7 @@ When `status: ocr_unavailable`, the user does not have tesseract installed. Do n
 The engine returns structured errors. Translate them for the user:
 - `rate_limit` → "fal.ai is busy, retrying in 5 seconds"
 - `policy_violation` → "Gemini rejected the prompt. Want to rephrase the subject?"
-- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key — check `FAL_KEY`"
-- `network` → "Couldn't reach fal.ai — check your connection"
+- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key: check `FAL_KEY`"
+- `network` → "Couldn't reach fal.ai: check your connection"
 - `download_failed` → "Generated, but the download failed. Retry?"
 - anything else → quote briefly, offer retry

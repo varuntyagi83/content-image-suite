@@ -1,6 +1,15 @@
 ---
 name: instagram-image-generator
-description: Generate Instagram feed posts (1:1), Stories/Reels (9:16), and carousels using Gemini Nano Banana Pro. Triggers on phrases like "make me an Instagram image", "generate an Instagram post", "Story for IG", "carousel for Instagram", or whenever a user asks for visuals tied specifically to Instagram. Uses INVERTED rotation philosophy compared to other platforms — maintains visual consistency across the feed grid rather than varying each post. Once an established style+palette emerges, future posts lock to it. Part of the Content Image Suite, uses the shared visual-engine.
+description: Generate Instagram feed posts (1:1), Stories/Reels (9:16), and carousels using Gemini Nano Banana Pro. Triggers on phrases like "make me an Instagram image", "generate an Instagram post", "Story for IG", "carousel for Instagram", or whenever a user asks for visuals tied specifically to Instagram. Uses INVERTED rotation philosophy compared to other platforms: maintains visual consistency across the feed grid rather than varying each post. Once an established style+palette emerges, future posts lock to it. Part of the Content Image Suite, uses the shared visual-engine.
+license: Proprietary. Contact author for redistribution terms.
+compatibility: Designed for Claude Code or Hermes Agent. Requires Python 3.10+, fal.ai API key (FAL_KEY), optionally ANTHROPIC_API_KEY or OPENAI_API_KEY for the quality gate.
+metadata:
+  author: Raygency (Varun Tyagi)
+  version: "1.0.0"
+  hermes:
+    tags: [creative, social-media, image-generation, instagram]
+    related_skills:
+      - content-image-orchestrator
 ---
 
 # Instagram Image Generator
@@ -11,9 +20,9 @@ This is called "consistency mode" in the engine, opposite to the "aggressive rot
 
 ## Output formats
 
-- `feed` — 1:1 (1080×1080), the standard square feed post
-- `story` — 9:16 (1080×1920), Stories or Reel cover
-- `carousel_slide` — 1:1 (1080×1080), one slide of a multi-slide carousel (2-10 slides)
+- `feed`: 1:1 (1080×1080), the standard square feed post
+- `story`: 9:16 (1080×1920), Stories or Reel cover
+- `carousel_slide`: 1:1 (1080×1080), one slide of a multi-slide carousel (2-10 slides)
 
 ## Style biases
 
@@ -32,11 +41,11 @@ Instagram favors visually rich, polished images:
 
 ## Consistency mode (the key difference)
 
-When the manifest has 3+ Instagram posts using a similar style+palette, the engine "locks" to that identity. Subsequent posts get the same style+palette automatically — the user doesn't have to think about it.
+When the manifest has 3+ Instagram posts using a similar style+palette, the engine "locks" to that identity. Subsequent posts get the same style+palette automatically: the user doesn't have to think about it.
 
 The engine reports this in its rotation output as `consistency_locked: true`. When you see this:
 
-1. Don't ask the user about style or palette — they've already established one.
+1. Don't ask the user about style or palette: they've already established one.
 2. Vary only composition and subject.
 3. If the user says "I want a different style for this one," confirm: "That'll break your grid look. Sure?" If they confirm, treat as a one-time override and add to notes.
 
@@ -62,12 +71,12 @@ This decision changes whether Gemini renders a recognizable face or defaults to 
 
 ### Step 1: Engine
 
-`<engine>` at `~/.claude/skills/visual-engine/scripts/engine.py`.
+`<engine>` = this skill's own `scripts/engine` wrapper, which auto-detects the shared visual-engine across runtimes. Resolve it as `${HERMES_SKILL_DIR}/scripts/engine` in Hermes Agent, or the absolute path to `scripts/engine` inside this skill's directory in Claude Code. Invoke directly without `python`.
 
 ## Path check (once per session, before first generation)
 
 ```bash
-python <engine> path-check --manifest <working-dir>/content-images/manifest.json
+<engine> path-check --manifest <working-dir>/content-images/manifest.json
 ```
 
 If response has `"suspicious": true`, tell the user once:
@@ -87,7 +96,7 @@ Instagram inputs are often vague ("a vibe"), unlike Medium drafts:
 | A photo / mood reference | Ask user to describe what they want; don't try to imitate uploaded references unless explicitly asked |
 | A long-form article URL | Fetch the article, treat like Medium but output 1:1 instead of 16:9 |
 
-If unclear, ask: "What's the post about? One sentence." Don't proceed with vague subjects on Instagram — vague generates beige.
+If unclear, ask: "What's the post about? One sentence." Don't proceed with vague subjects on Instagram: vague generates beige.
 
 ### Step 3: Cross-session linking + format mode
 
@@ -102,7 +111,7 @@ If the user said "Instagram" without specifying, ask: "Feed (1:1), Story (9:16),
 ### Step 4: Run rotation
 
 ```bash
-python <engine>/engine.py rotate \
+<engine> rotate \
   --manifest <working-dir>/content-images/manifest.json \
   --platform instagram \
   --post-type <type>
@@ -124,7 +133,7 @@ Avoid: abstract metaphors that worked on Medium will look weak on Instagram.
 
 ### Step 6a: Feed mode workflow
 
-**For every generation in this skill (feed, story, or carousel slide), handle three response statuses from `python <engine> generate`:**
+**For every generation in this skill (feed, story, or carousel slide), handle three response statuses from `<engine> generate`:**
 - `"status": "ok"` → proceed to show + ask.
 - `"status": "file_exists"` (exit 4) → ask user: "Already generated this on `<modified_at>`. Use it, or regenerate?" Regenerate = same command with `--overwrite`.
 - `"status": "error"` → translate per the Error code translation section.
@@ -153,7 +162,7 @@ Stories often have text overlays the user adds later in Instagram's editor. Tell
 Like LinkedIn carousels but Instagram-specific:
 
 1. **Pick ONE style + ONE palette** for all slides (visual coherence is even more important on IG than LinkedIn).
-2. **Plan slide structure** — but unlike LinkedIn, IG carousels often have less didactic structure. Common pattern: hook → 3-7 elaborations → payoff.
+2. **Plan slide structure**: but unlike LinkedIn, IG carousels often have less didactic structure. Common pattern: hook → 3-7 elaborations → payoff.
 3. **Vary compositions** but more subtly than LinkedIn (the grid context wants flow, not contrast).
 4. **Generate one slide at a time** with feedback in between.
 
@@ -162,7 +171,7 @@ Like LinkedIn carousels but Instagram-specific:
 Show one short summary line, the image, and one feedback question. For consistency-locked generation, the summary line can mention coherence:
 > "Maintaining your established cinematic + monochrome-noir look. Slide 1 ready."
 
-This is the only place the skill mentions the consistency mechanic — it's a positive signal to the user that their grid is staying coherent.
+This is the only place the skill mentions the consistency mechanic: it's a positive signal to the user that their grid is staying coherent.
 
 ### Step 8: Iteration
 
@@ -198,7 +207,7 @@ End with: *"Saved. Your feed will stay coherent."* (Or just "Saved." if not cons
 
 ## Reels covers
 
-When the user says "Reel" they usually mean the cover image — the visual frame Instagram shows when the Reel isn't playing. Treat this exactly like a Story (9:16) with one extra rule: the subject should be readable as a single still image even though the actual content is video.
+When the user says "Reel" they usually mean the cover image: the visual frame Instagram shows when the Reel isn't playing. Treat this exactly like a Story (9:16) with one extra rule: the subject should be readable as a single still image even though the actual content is video.
 
 If the user is asking for *Reel content* (animated video frames), this skill can't do that. Tell them: "I generate still images. For animated Reels you'd need a video tool. Want me to do the Reel cover instead?"
 
@@ -212,23 +221,23 @@ Same rules as Medium. The user never sees "consistency_locked", "schema", or any
 ## Protagonist mode (build-prompt)
 
 When building prompts, pass `--protagonist-mode` based on the source post:
-- `named` — first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
-- `generic` — posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
-- `none` — pure object/scene images with no human figure.
-- `auto` (default) — heuristic detection from the subject string.
+- `named`: first-person posts, named profiles, personal essays where the author/subject is central. Triggers the engine to add face-clarity guidance.
+- `generic`: posts featuring "a user," "a customer," "workers" without a specific identity. Faces can be obscured by editorial convention.
+- `none`: pure object/scene images with no human figure.
+- `auto` (default): heuristic detection from the subject string.
 
 For named-protagonist posts, also write the subject explicitly: include age range, expression, and an identifying gesture ("a founder, mid-30s, focused expression" not "a marketer"). The face-guidance directive in the prompt depends on the subject naming a person.
 
-The build-prompt response includes `protagonist_mode_resolved` — if it shows "named", the prompt now requests a clear visible face.
+The build-prompt response includes `protagonist_mode_resolved`: if it shows "named", the prompt now requests a clear visible face.
 
 ## Label-risk handling (applies to every build-prompt call)
 
 `build-prompt` returns two fields: `label_risk_detected` (bool) and `label_risk_reason` (str).
 
-When `label_risk_detected: true` — the subject has label-shaped phrasing (comma-separated capitalized phrases, quoted text, or multiple short label-like segments) that Gemini will likely render as visible text. The engine has already prepended an aggressive no-text negative.
+When `label_risk_detected: true`: the subject has label-shaped phrasing (comma-separated capitalized phrases, quoted text, or multiple short label-like segments) that Gemini will likely render as visible text. The engine has already prepended an aggressive no-text negative.
 
 Mention this casually to the user once per session:
-> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text leaks anyway, we can rephrase — see the visual proxies section in `subject-extraction.md`.
+> Heads up: your subject has label-like phrasing, so I added a strong no-text negative. If text leaks anyway, we can rephrase: see the visual proxies section in `subject-extraction.md`.
 
 Then proceed. If text still appears in the generated image, the fix is on the subject side: rephrase the labels as a continuous scene or use visual proxies.
 
@@ -236,16 +245,16 @@ Then proceed. If text still appears in the generated image, the fix is on the su
 ## Text detection (post-generation safety net)
 
 Every successful `generate` response includes a `text_detection` field with:
-- `passed` (bool) — true if OCR found no rendered text
-- `words_found` (list) — what words OCR detected, if any
-- `status` — "ok", "text_detected", or "ocr_unavailable"
+- `passed` (bool): true if OCR found no rendered text
+- `words_found` (list): what words OCR detected, if any
+- `status`: "ok", "text_detected", or "ocr_unavailable"
 
 When `passed: false`, the image likely has rendered text (a clock face, a folder label, a sign). Surface to the user:
 > OCR detected text in this image: `<words>`. Want me to regenerate with a stronger no-text directive?
 
 If user agrees, re-run `generate` with `--overwrite`. The engine will apply more aggressive subject rewriting on the retry.
 
-When `status: ocr_unavailable`, the user does not have tesseract installed. Do not flag this — proceed silently. Only mention if user explicitly asks why text was not caught:
+When `status: ocr_unavailable`, the user does not have tesseract installed. Do not flag this: proceed silently. Only mention if user explicitly asks why text was not caught:
 > The OCR safety net needs tesseract. `brew install tesseract && pip install pytesseract pillow` enables it.
 
 ## Error code translation
@@ -253,7 +262,7 @@ When `status: ocr_unavailable`, the user does not have tesseract installed. Do n
 The engine returns structured errors. Translate them for the user:
 - `rate_limit` → "fal.ai is busy, retrying in 5 seconds"
 - `policy_violation` → "Gemini rejected the prompt. Want to rephrase the subject?"
-- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key — check `FAL_KEY`"
-- `network` → "Couldn't reach fal.ai — check your connection"
+- `auth` / `fal_key_missing` → "fal.ai isn't accepting the key: check `FAL_KEY`"
+- `network` → "Couldn't reach fal.ai: check your connection"
 - `download_failed` → "Generated, but the download failed. Retry?"
 - anything else → quote briefly, offer retry
