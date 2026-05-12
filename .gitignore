@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Test artifacts
+.coverage
+htmlcov/
+
+# Generated images (during dev)
+content-images/
+test-output/
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# Local secrets (just in case)
+.env
+.env.local
+
+# Backup files
+*.backup
+*.v1.backup
+manifest.corrupt.*.json
+
+# Old distribution zips
+content-image-suite_v*.zip
+
+# Local Claude Code project state
+.claude/
+
+# Manifest lock sidecars
+*.lock
