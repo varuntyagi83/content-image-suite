@@ -11,6 +11,7 @@ metadata:
     related_skills:
       - content-image-orchestrator
       - medium-image-generator
+    requires_toolsets: [terminal, file]
 ---
 
 # LinkedIn Image Generator

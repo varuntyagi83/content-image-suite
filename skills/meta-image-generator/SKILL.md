@@ -10,6 +10,7 @@ metadata:
     tags: [creative, social-media, image-generation, facebook, meta]
     related_skills:
       - content-image-orchestrator
+    requires_toolsets: [terminal, file]
 ---
 
 # Meta/Facebook Image Generator

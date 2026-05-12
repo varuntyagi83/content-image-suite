@@ -11,6 +11,7 @@ metadata:
     related_skills:
       - content-image-orchestrator
       - linkedin-image-generator
+    requires_toolsets: [terminal, file]
 ---
 
 # Medium Image Generator (v2)

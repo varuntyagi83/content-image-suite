@@ -15,6 +15,7 @@ metadata:
       - instagram-image-generator
       - meta-image-generator
       - infographic-generator
+    requires_toolsets: [terminal, file]
 ---
 
 # Content Image Orchestrator

@@ -12,6 +12,7 @@ metadata:
       - content-image-orchestrator
       - medium-image-generator
       - linkedin-image-generator
+    requires_toolsets: [terminal, file]
 ---
 
 # Infographic Generator

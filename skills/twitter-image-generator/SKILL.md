@@ -10,6 +10,7 @@ metadata:
     tags: [creative, social-media, image-generation, twitter, x]
     related_skills:
       - content-image-orchestrator
+    requires_toolsets: [terminal, file]
 ---
 
 # Twitter/X Image Generator

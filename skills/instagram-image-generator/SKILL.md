@@ -10,6 +10,7 @@ metadata:
     tags: [creative, social-media, image-generation, instagram]
     related_skills:
       - content-image-orchestrator
+    requires_toolsets: [terminal, file]
 ---
 
 # Instagram Image Generator
