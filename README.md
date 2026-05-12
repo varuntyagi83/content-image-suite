@@ -72,7 +72,18 @@ Instagram's "consistency mode" is the unusual one: after 3 posts using a similar
 
 ## Install
 
-The suite is authored to the [agentskills.io](https://agentskills.io/specification) open standard. The same SKILL.md files run unchanged in Claude Code, Hermes Agent, Codex CLI, Gemini CLI, and Cursor. Three install paths:
+The suite is authored to the [agentskills.io](https://agentskills.io/specification) open standard. The same SKILL.md files run unchanged in Claude Code, Hermes Agent, Codex CLI, Gemini CLI, and Cursor.
+
+### Recommended: one-question setup
+
+```bash
+cd /path/to/content-image-suite
+./setup.sh
+```
+
+`setup.sh` auto-detects which agent runtime is installed (Claude Code, Hermes Agent, or both), asks one question if ambiguous, persists the choice to `~/.content-image-suite/config`, and dispatches to the right installer. Re-runs are no-ops unless you pass `--reconfigure`. Bypass detection with `./setup.sh --force claude`, `--force hermes`, or `--force both`.
+
+The three install paths below run automatically based on the choice. They are also callable directly if you prefer.
 
 ### Claude Code, solo install
 
